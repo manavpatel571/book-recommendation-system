@@ -7,11 +7,18 @@ import os
 
 app = Flask(__name__)
 
-# ---------- S3 SETUP ----------
+# ✅ REPLACE THESE WITH os.environ.get(...) IN PRODUCTION
+aws_access_key = os.environ.get('AWS_ACCESS_KEY_ID')
+aws_secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
 
+
+# ---------- S3 SETUP ----------
 def download_from_s3(bucket_name, file_key, local_filename):
     if not os.path.exists(local_filename):
-        s3 = boto3.client('s3')
+        s3 = boto3.client('s3',
+            aws_access_key_id=aws_access_key,
+            aws_secret_access_key=aws_secret_key
+        )
         s3.download_file(bucket_name, file_key, local_filename)
         print(f"✅ Downloaded {file_key} from S3.")
     else:
@@ -43,7 +50,6 @@ test = pickle.load(open('test.pkl', 'rb'))
 avg_rating_df = pickle.load(open('avg_rating_df.pkl', 'rb'))
 
 # ---------- FLASK ROUTES ----------
-
 @app.route('/')
 def index():
     return render_template('index.html',
@@ -52,7 +58,8 @@ def index():
                            image=list(popular_df['Image-URL-M'].values),
                            votes=list(popular_df['num-ratings'].values),
                            ratings=list(popular_df['avg-ratings'].values),
-                           isbn_numbers=[books.loc[books['Book-Title'] == title, 'ISBN'].values[0] for title in popular_df['Book-Title']])
+                           isbn_numbers=[books.loc[books['Book-Title'] == title, 'ISBN'].values[0]
+                                         for title in popular_df['Book-Title']])
 
 @app.route('/recommend')
 def recommend_ui():
@@ -77,34 +84,29 @@ def recommend():
             item.append(avg_ratings)
             item.append(isbn_number)
             data.append(item)
+        return render_template('recommend.html', data=data, similar_books_found=True, user_input=user_input)
 
-        similar_books_found = True
-    else:
-        api_url = f'https://www.googleapis.com/books/v1/volumes?q=intitle:{user_input}&maxResults=11'
-        response = requests.get(api_url)
-        if response.status_code == 200:
-            data = response.json()
-            if 'items' in data:
-                results = []
-                for item in data['items']:
-                    volume_info = item.get('volumeInfo', {})
-                    title = volume_info.get('title', 'N/A')
-                    authors = volume_info.get('authors', ['N/A'])
-                    authors = authors[0] if authors else 'N/A'
-                    image_url = volume_info['imageLinks']['thumbnail'] if 'imageLinks' in volume_info else '/static/images/defaultbook.jpg'
-                    avg_rating = volume_info.get('averageRating', 'N/A')
-                    identifiers = volume_info.get('industryIdentifiers', [])
-                    isbn_10 = next((identifier['identifier'] for identifier in identifiers if identifier.get('type') == 'ISBN_10'), None)
-                    other_identifier = next((identifier['identifier'] for identifier in identifiers if identifier.get('type') == 'OTHER'), None)
-                    isbn_number = isbn_10 if isbn_10 else other_identifier
-                    results.append([title, authors, image_url, avg_rating, isbn_number])
-                return render_template('recommend.html', data=results, similar_books_found=False, user_input=user_input)
-            else:
-                return render_template('recommend.html', data=None, similar_books_found=False, user_input=user_input)
-        else:
-            return render_template('recommend.html', data=None, similar_books_found=False, user_input=user_input)
-
-    return render_template('recommend.html', data=data, similar_books_found=True, user_input=user_input)
+    # If not found, fallback to Google Books API
+    api_url = f'https://www.googleapis.com/books/v1/volumes?q=intitle:{user_input}&maxResults=11'
+    response = requests.get(api_url)
+    if response.status_code == 200:
+        data = response.json()
+        if 'items' in data:
+            results = []
+            for item in data['items']:
+                volume_info = item.get('volumeInfo', {})
+                title = volume_info.get('title', 'N/A')
+                authors = volume_info.get('authors', ['N/A'])
+                authors = authors[0] if authors else 'N/A'
+                image_url = volume_info['imageLinks']['thumbnail'] if 'imageLinks' in volume_info else '/static/images/defaultbook.jpg'
+                avg_rating = volume_info.get('averageRating', 'N/A')
+                identifiers = volume_info.get('industryIdentifiers', [])
+                isbn_10 = next((identifier['identifier'] for identifier in identifiers if identifier.get('type') == 'ISBN_10'), None)
+                other_identifier = next((identifier['identifier'] for identifier in identifiers if identifier.get('type') == 'OTHER'), None)
+                isbn_number = isbn_10 if isbn_10 else other_identifier
+                results.append([title, authors, image_url, avg_rating, isbn_number])
+            return render_template('recommend.html', data=results, similar_books_found=False, user_input=user_input)
+    return render_template('recommend.html', data=None, similar_books_found=False, user_input=user_input)
 
 @app.route('/rerecommend', methods=['POST'])
 def rerecommend():
@@ -125,31 +127,8 @@ def rerecommend():
             item.append(avg_ratings)
             item.append(isbn_number)
             data.append(item)
-    else:
-        api_url = f'https://www.googleapis.com/books/v1/volumes?q=intitle:{input}&maxResults=11'
-        response = requests.get(api_url)
-        if response.status_code == 200:
-            data = response.json()
-            if 'items' in data:
-                results = []
-                for item in data['items']:
-                    volume_info = item.get('volumeInfo', {})
-                    title = volume_info.get('title', 'N/A')
-                    authors = volume_info.get('authors', ['N/A'])
-                    authors = authors[0] if authors else 'N/A'
-                    image_url = volume_info['imageLinks']['thumbnail'] if 'imageLinks' in volume_info else '/static/images/defaultbook.jpg'
-                    avg_rating = volume_info.get('averageRating', 'N/A')
-                    identifiers = volume_info.get('industryIdentifiers', [])
-                    isbn_10 = next((identifier['identifier'] for identifier in identifiers if identifier.get('type') == 'ISBN_10'), None)
-                    other_identifier = next((identifier['identifier'] for identifier in identifiers if identifier.get('type') == 'OTHER'), None)
-                    isbn_number = isbn_10 if isbn_10 else other_identifier
-                    results.append([title, authors, image_url, avg_rating, isbn_number])
-                return jsonify(data=results)
-            else:
-                return render_template('recommend.html', data=None)
-        else:
-            return render_template('recommend.html', data=None)
-    return jsonify(data=data)
+        return jsonify(data=data)
+    return jsonify(data=[])
 
 @app.route('/dropdown', methods=['GET'])
 def dropdown():
@@ -170,4 +149,5 @@ def about():
     return render_template('about.html')
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0",port=8080)
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)
