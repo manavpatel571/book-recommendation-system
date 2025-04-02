@@ -1,0 +1,30 @@
+# Ignore virtual environment
+venv/
+
+# Ignore pickle files
+*.pkl
+model/
+
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Environment files
+.env
+*.env
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# VSCode settings
+.vscode/
+
+
+
+ 

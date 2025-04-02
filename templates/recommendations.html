@@ -1,0 +1,15 @@
+{% if data %}
+    <section class="mightlike">
+        <h2><!--You searched for "<span style="color: white;">{{ data[0][0] }}</span>" book <br><br>--> People aslo like :</h2>
+        {% for i in data %}
+        <a style="text-decoration: none;">
+            <div class="card" data-name="{{i[0]}}">
+                <img src="{{i[2]}}">
+                <br>
+                <h1>{{i[0]}}</h1>
+                <!-- <h3>{{i[1]}}</h3> -->
+            </div>
+        </a>
+        {% endfor %}
+    </section>
+{% endif %}
