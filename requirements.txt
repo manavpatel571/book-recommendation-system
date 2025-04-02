@@ -1,4 +1,6 @@
-flask 
-numpy 
+Flask
+gunicorn
+numpy
+pandas
 requests
 boto3
